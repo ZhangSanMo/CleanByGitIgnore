@@ -6,8 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/go-git/go-billy/v5/osfs"
-	"github.com/go-git/go-git/v5/plumbing/format/gitignore"
+	"github.com/monochromegane/go-gitignore"
 )
 
 var SEP = string(os.PathSeparator)
@@ -32,25 +31,23 @@ func main() {
 		fmt.Println("Must be directory")
 		return
 	}
-	patterns, err := gitignore.ReadPatterns(osfs.New(dir), nil)
+	ignoreFilePath := dir + SEP + ".gitignore"
+	matcher, err := gitignore.NewGitIgnore(ignoreFilePath)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	// patterns := []gitignore.Pattern{gitignore.ParsePattern("Debug/", []string{"."})}
-	matcher := gitignore.NewMatcher(patterns)
-	xx := walkDir(dir, []string{}, [][]string{}, matcher)
+	xx := walkDir(dir, []string{}, []string{}, matcher)
 	deleteWaitlist := []string{}
 	for _, file := range xx {
-		filePath := strings.Join(file, SEP)
-		fileinfo, err := os.Stat(filePath)
+		fileinfo, err := os.Stat(file)
 		if err != nil {
 			fmt.Println(err)
 			continue
 		}
 		if matcher.Match(file, fileinfo.IsDir()) {
-			fmt.Println(filePath)
-			deleteWaitlist = append(deleteWaitlist, filePath)
+			fmt.Println(file)
+			deleteWaitlist = append(deleteWaitlist, file)
 		}
 	}
 	if len(deleteWaitlist) == 0 {
@@ -72,7 +69,7 @@ func main() {
 }
 
 // walk dir, if match gitignore, skip ignored sub folder
-func walkDir(dir string, domain []string, collections [][]string, mathcer gitignore.Matcher) [][]string {
+func walkDir(dir string, domain []string, collections []string, mathcer gitignore.IgnoreMatcher) []string {
 	// copy domain
 	domainCopy := make([]string, len(domain)+1)
 	copy(domainCopy, domain)
@@ -88,10 +85,11 @@ func walkDir(dir string, domain []string, collections [][]string, mathcer gitign
 		domainCopyCopy := make([]string, len(domainCopy)+1)
 		copy(domainCopyCopy, domainCopy)
 		domainCopyCopy[len(domainCopyCopy)-1] = file.Name()
-		collections = append(collections, domainCopyCopy)
+		filePath := strings.Join(domainCopyCopy, SEP)
+		collections = append(collections, filePath)
 		// if exculde, skip sub folder
 		isDir := file.IsDir()
-		if isDir && !mathcer.Match(domainCopyCopy, isDir) {
+		if isDir && !mathcer.Match(filePath, isDir) {
 			collections = walkDir(file.Name(), domainCopy, collections, mathcer)
 		}
 	}
